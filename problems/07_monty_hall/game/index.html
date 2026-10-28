@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Монти Холл: кто ведущий?</title>
+<meta name="description" content="Игра по парадоксу Монти Холла с разными типами ведущего: от классического до вредного. Угадайте ведущего по его поведению.">
+<style>
+  :root {
+    --surface: #fcfcfb;
+    --page: #f9f9f7;
+    --card: #ffffff;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --line: #e1e0d9;
+    --axis: #c3c2b7;
+    --blue: #2a78d6;
+    --orange: #eb6834;
+    --aqua: #1baf7a;
+    --door: #2a78d6;
+    --door-edge: #1c5cab;
+    --good: #0ca30c;
+    --bad: #d03b3b;
+    --good-text: #006300;
+    --bad-text: #b02a2a;
+    --focus: #eb6834;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --surface: #1a1a19;
+      --page: #0d0d0d;
+      --card: #1f1f1e;
+      --ink: #f0efec;
+      --ink-2: #c3c2b7;
+      --muted: #898781;
+      --line: #2c2c2a;
+      --axis: #383835;
+      --blue: #3987e5;
+      --orange: #d95926;
+      --aqua: #199e70;
+      --door: #3987e5;
+      --door-edge: #256abf;
+      --good-text: #0ca30c;
+      --bad-text: #e66767;
+    }
+  }
+  :root[data-theme="dark"] {
+    --surface: #1a1a19;
+    --page: #0d0d0d;
+    --card: #1f1f1e;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --line: #2c2c2a;
+    --axis: #383835;
+    --blue: #3987e5;
+    --orange: #d95926;
+    --aqua: #199e70;
+    --door: #3987e5;
+    --door-edge: #256abf;
+    --good-text: #0ca30c;
+    --bad-text: #e66767;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--ink);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 900px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  .lead { color: var(--ink-2); margin: 0 0 20px; }
+  a { color: var(--blue); }
+
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tab {
+    border: 1px solid var(--axis); background: var(--card); color: var(--ink);
+    padding: 8px 14px; border-radius: 8px; cursor: pointer; font: inherit;
+  }
+  .tab[aria-selected="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px; margin-bottom: 16px;
+  }
+  .card h2 { font-size: 1.05rem; margin: 0 0 10px; }
+
+  .hosts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .host-btn {
+    border: 1px solid var(--axis); background: var(--surface); color: var(--ink);
+    padding: 6px 12px; border-radius: 999px; cursor: pointer; font: inherit; font-size: .95rem;
+  }
+  .host-btn[aria-pressed="true"] { border-color: var(--blue); box-shadow: inset 0 0 0 1px var(--blue); }
+  .host-desc { color: var(--ink-2); margin: 10px 0 0; font-size: .95rem; }
+
+  .stage { text-align: center; }
+  .doors { display: flex; justify-content: center; gap: 16px; margin: 8px 0 16px; }
+  .door {
+    width: min(150px, 28vw); aspect-ratio: 3 / 5; border-radius: 10px 10px 4px 4px;
+    border: 3px solid var(--door-edge); background: var(--door); color: #fff;
+    font: 700 1.6rem/1 system-ui, sans-serif; cursor: pointer; position: relative;
+    display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px;
+    transition: transform .15s, background .2s;
+  }
+  .door:not(:disabled):hover { transform: translateY(-3px); }
+  .door::after {
+    content: ""; position: absolute; right: 14%; top: 52%; width: 9px; height: 9px;
+    border-radius: 50%; background: #fff; opacity: .85;
+  }
+  .door.open { background: var(--surface); color: var(--ink); cursor: default; }
+  .door.open::after { display: none; }
+  .door .prize { font-size: 2.6rem; }
+  .door .num { font-size: 1rem; }
+  .door.picked { outline: 4px solid var(--orange); outline-offset: 4px; }
+  .door:disabled { cursor: default; }
+  .door:focus-visible, button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+  .tag {
+    position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+    background: var(--orange); color: #fff; font-size: .75rem; font-weight: 600;
+    padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+  }
+
+  .message { min-height: 3em; margin: 0 0 12px; font-size: 1.05rem; }
+  .message .win { color: var(--good-text); font-weight: 600; }
+  .message .lose { color: var(--bad-text); font-weight: 600; }
+  .actions { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; min-height: 44px; }
+  .btn {
+    border: 0; border-radius: 8px; padding: 10px 18px; font: 600 1rem system-ui, sans-serif;
+    cursor: pointer; color: #fff; background: var(--ink-2);
+  }
+  .btn.stay { background: var(--blue); }
+  .btn.switch { background: var(--orange); }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--axis); }
+  .btn:disabled { opacity: .45; cursor: default; }
+
+  .hint {
+    margin: 14px auto 0; max-width: 520px; font-size: .95rem; color: var(--ink-2);
+    border-top: 1px dashed var(--line); padding-top: 10px;
+  }
+  .hint strong { color: var(--ink); }
+  label.toggle { display: inline-flex; gap: 6px; align-items: center; color: var(--ink-2); font-size: .95rem; cursor: pointer; }
+
+  table { width: 100%; border-collapse: collapse; font-size: .95rem; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--ink-2); font-weight: 600; }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+  .bar-cell { width: 34%; }
+  .bar { position: relative; height: 12px; background: var(--line); border-radius: 3px; }
+  .bar > span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; }
+  .bar > i { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
+  .note { color: var(--muted); font-size: .85rem; margin: 8px 0 0; }
+  .auto { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
+
+  .post-row { display: grid; grid-template-columns: 150px 1fr 52px; gap: 10px; align-items: center; margin: 6px 0; }
+  .post-row .bar { height: 14px; }
+  .post-row .val { text-align: right; font-variant-numeric: tabular-nums; }
+  .guess { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .history { font-size: .9rem; color: var(--ink-2); margin: 8px 0 0; }
+
+  [hidden] { display: none !important; }
+
+  @media (max-width: 560px) {
+    .post-row { grid-template-columns: 110px 1fr 44px; }
+    .doors { gap: 10px; }
+    .bar-cell { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Монти Холл: кто ведущий?</h1>
+  <p class="lead">
+    Выберите дверь, за одной из трёх — автомобиль. Ответ «менять выгодно, 2/3» верен только для классического ведущего.
+    Здесь можно сыграть против разных ведущих и попробовать вычислить незнакомого по его поведению.
+    <a href="https://github.com/kogriv/Stata/tree/main/problems/07_monty_hall">Разбор с формулами</a>.
+  </p>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-known" aria-selected="true" aria-controls="panel-known">Известный ведущий</button>
+    <button class="tab" role="tab" id="tab-hidden" aria-selected="false" aria-controls="panel-hidden">Угадай ведущего</button>
+  </div>
+
+  <section id="panel-known" role="tabpanel" aria-labelledby="tab-known">
+    <div class="card">
+      <h2>Ведущий</h2>
+      <div class="hosts" id="host-picker"></div>
+      <p class="host-desc" id="host-desc"></p>
+    </div>
+  </section>
+
+  <section id="panel-hidden" role="tabpanel" aria-labelledby="tab-hidden" hidden>
+    <div class="card">
+      <h2>Ведущий скрыт</h2>
+      <p class="host-desc" style="margin-top:0">
+        Игра тайно выбрала одного из четырёх ведущих: классического, не знающего, вредного или доброго.
+        Играйте раунды и следите, как меняются вероятности. Когда будете готовы — назовите ведущего.
+      </p>
+    </div>
+  </section>
+
+  <div class="card stage">
+    <div class="doors" id="doors"></div>
+    <p class="message" id="message" aria-live="polite"></p>
+    <div class="actions" id="actions"></div>
+    <div class="hint">
+      <label class="toggle"><input type="checkbox" id="hint-toggle"> Показывать расчёт по Байесу</label>
+      <div id="hint" hidden></div>
+    </div>
+  </div>
+
+  <div class="card" id="stats-card">
+    <h2>Статистика: выигрыши, когда смену предложили</h2>
+    <table>
+      <thead><tr><th>Стратегия</th><th>Игр</th><th>Побед</th><th>Доля</th><th class="bar-cell"></th><th>Теория</th></tr></thead>
+      <tbody id="stats-body"></tbody>
+    </table>
+    <p class="note" id="stats-note"></p>
+    <div class="auto" id="auto">
+      <span style="color:var(--ink-2)">Сыграть 1000 раз:</span>
+      <button class="btn ghost" data-auto="0">всегда оставаться</button>
+      <button class="btn ghost" data-auto="1">всегда менять</button>
+      <button class="btn ghost" data-auto="0.5">монетка</button>
+      <button class="btn ghost" id="reset-stats">Сбросить</button>
+    </div>
+    <p class="note">Вертикальная риска на полосе — теоретическое значение.</p>
+  </div>
+
+  <div class="card" id="posterior-card" hidden>
+    <h2>Кто ведущий: вероятности после <span id="rounds-count">0</span> раундов</h2>
+    <div id="posterior"></div>
+    <p class="history" id="history"></p>
+    <div class="guess" id="guess"></div>
+    <p class="message" id="guess-result" aria-live="polite" style="margin-top:12px"></p>
+  </div>
+</main>
+
+<script>
+(() => {
+  "use strict";
+
+  const DOORS = [0, 1, 2];
+  const others = (k) => DOORS.filter((d) => d !== k);
+
+  // Каждый ведущий — распределение действий при данных машине c и выборе игрока k.
+  // Действия: offer (открыл дверь d с козой и предложил смену), nooffer (не предложил),
+  // carshown (случайно открыл машину за дверью d).
+  const HOSTS = {
+    classic: {
+      name: "Классический",
+      desc: "Знает, где машина, всегда открывает дверь с козой и всегда предлагает смену. Смена выигрывает в 2/3 случаев.",
+      theory: { stay: 1 / 3, switch: 2 / 3 },
+      actions(c, k) {
+        const goats = others(k).filter((d) => d !== c);
+        return goats.map((d) => ({ type: "offer", door: d, p: 1 / goats.length }));
+      },
+    },
+    ignorant: {
+      name: "Не знает",
+      desc: "Не знает, где машина, и открывает одну из двух дверей наугад. Если там машина — раунд аннулируется. Если коза — шансы 50/50.",
+      theory: { stay: 1 / 2, switch: 1 / 2 },
+      actions(c, k) {
+        return others(k).map((d) => ({ type: d === c ? "carshown" : "offer", door: d, p: 1 / 2 }));
+      },
+    },
+    evil: {
+      name: "Вредный",
+      desc: "Предлагает смену, только если вы угадали машину. Если не угадали — сразу открывает вашу дверь с козой. Так Монти Холл играл с журналистом NYT в 1991 году.",
+      theory: { stay: 1, switch: 0 },
+      actions(c, k) {
+        if (k !== c) return [{ type: "nooffer", p: 1 }];
+        const goats = others(k);
+        return goats.map((d) => ({ type: "offer", door: d, p: 1 / 2 }));
+      },
+    },
+    angel: {
+      name: "Добрый",
+      desc: "Предлагает смену, только если вы ошиблись. Если угадали — просто открывает вашу дверь с машиной.",
+      theory: { stay: 0, switch: 1 },
+      actions(c, k) {
+        if (k === c) return [{ type: "nooffer", p: 1 }];
+        const goat = others(k).find((d) => d !== c);
+        return [{ type: "offer", door: goat, p: 1 }];
+      },
+    },
+    favourite: {
+      name: "Любит правую дверь",
+      desc: "Как классический, но если может выбирать между двумя козами, всегда открывает правую. Тогда открытая левая дверь выдаёт: смена выигрывает наверняка.",
+      theory: { stay: 1 / 3, switch: 2 / 3 },
+      actions(c, k) {
+        const goats = others(k).filter((d) => d !== c);
+        return [{ type: "offer", door: Math.max(...goats), p: 1 }];
+      },
+    },
+  };
+  const HIDDEN_POOL = ["classic", "ignorant", "evil", "angel"];
+
+  function sample(dist) {
+    let r = Math.random();
+    for (const a of dist) { if ((r -= a.p) < 0) return a; }
+    return dist[dist.length - 1];
+  }
+
+  function likelihood(host, c, k, act) {
+    const a = HOSTS[host].actions(c, k).find((x) => x.type === act.type && (x.door ?? -1) === (act.door ?? -1));
+    return a ? a.p : 0;
+  }
+
+  // P(смена выигрывает | смену предложили, открыта дверь d), с учётом неопределённости о ведущем
+  function switchWinProb(post, k, act) {
+    const other = others(k).find((d) => d !== act.door);
+    let total = 0, win = 0;
+    for (const h of Object.keys(post)) {
+      for (const c of DOORS) {
+        const w = post[h] * (1 / 3) * likelihood(h, c, k, act);
+        total += w;
+        if (c === other) win += w;
+      }
+    }
+    return total > 0 ? win / total : NaN;
+  }
+
+  const pct = (x) => (Number.isFinite(x) ? Math.round(x * 100) + "%" : "—");
+
+  // ---------- состояние ----------
+  const state = {
+    mode: "known",
+    host: "classic",
+    hiddenHost: null,
+    post: null,
+    rounds: 0,
+    history: [],
+    car: null, pick: null, act: null, phase: "pick", final: null,
+    stats: null,
+  };
+
+  function freshStats() {
+    return {
+      stay: { n: 0, w: 0 }, switch: { n: 0, w: 0 }, coin: { n: 0, w: 0 },
+      nooffer: 0, voided: 0,
+    };
+  }
+  state.stats = freshStats();
+
+  // ---------- элементы ----------
+  const $ = (id) => document.getElementById(id);
+  const doorsEl = $("doors"), msgEl = $("message"), actionsEl = $("actions");
+  const hintToggle = $("hint-toggle"), hintEl = $("hint");
+
+  // ---------- выбор ведущего ----------
+  function renderHostPicker() {
+    const box = $("host-picker");
+    box.innerHTML = "";
+    for (const [key, h] of Object.entries(HOSTS)) {
+      const b = document.createElement("button");
+      b.className = "host-btn";
+      b.textContent = h.name;
+      b.setAttribute("aria-pressed", String(key === state.host));
+      b.addEventListener("click", () => {
+        state.host = key;
+        state.stats = freshStats();
+        renderHostPicker();
+        newRound();
+        renderStats();
+      });
+      box.appendChild(b);
+    }
+    $("host-desc").textContent = HOSTS[state.host].desc;
+  }
+
+  function activeHost() { return state.mode === "known" ? state.host : state.hiddenHost; }
+
+  // ---------- раунд ----------
+  function newRound() {
+    state.car = Math.floor(Math.random() * 3);
+    state.pick = null; state.act = null; state.final = null;
+    state.phase = "pick";
+    msgEl.textContent = "Выберите дверь.";
+    renderDoors(); renderActions(); renderHint();
+  }
+
+  function onPick(k) {
+    if (state.phase !== "pick") return;
+    state.pick = k;
+    state.act = sample(HOSTS[activeHost()].actions(state.car, k));
+    const a = state.act;
+    if (a.type === "offer") {
+      state.phase = "decide";
+      const other = others(k).find((d) => d !== a.door);
+      msgEl.textContent = `Ведущий открыл дверь ${a.door + 1} — там коза. Оставить дверь ${k + 1} или сменить на ${other + 1}?`;
+    } else if (a.type === "nooffer") {
+      finish(null);
+      return;
+    } else {
+      finish(null);
+      return;
+    }
+    renderDoors(); renderActions(); renderHint();
+  }
+
+  function onDecide(sw) {
+    if (state.phase !== "decide") return;
+    const other = others(state.pick).find((d) => d !== state.act.door);
+    finish(sw ? other : state.pick, sw);
+  }
+
+  function finish(finalDoor, switched) {
+    const a = state.act;
+    state.phase = "done";
+    let html;
+    if (a.type === "carshown") {
+      html = `Ведущий открыл дверь ${a.door + 1}, а там машина. Раунд аннулирован.`;
+      state.stats.voided++;
+    } else if (a.type === "nooffer") {
+      state.final = state.pick;
+      const won = state.pick === state.car;
+      html = `Ведущий не стал предлагать смену и открыл вашу дверь. ` +
+        (won ? `<span class="win">Машина — вы выиграли!</span>` : `<span class="lose">Коза — вы проиграли.</span>`);
+      state.stats.nooffer++;
+    } else {
+      state.final = finalDoor;
+      const won = finalDoor === state.car;
+      const key = switched ? "switch" : "stay";
+      state.stats[key].n++;
+      if (won) state.stats[key].w++;
+      html = (switched ? "Вы сменили дверь. " : "Вы остались при своей двери. ") +
+        (won ? `<span class="win">Машина — вы выиграли!</span>` : `<span class="lose">Коза — вы проиграли.</span>`);
+    }
+    msgEl.innerHTML = html;
+
+    if (state.mode === "hidden") {
+      updatePosterior();
+    }
+    renderDoors(); renderActions(); renderHint(); renderStats();
+  }
+
+  // ---------- отрисовка ----------
+  function renderDoors() {
+    doorsEl.innerHTML = "";
+    for (const d of DOORS) {
+      const b = document.createElement("button");
+      b.className = "door";
+      const isOpen = state.phase === "done" || (state.act && state.act.door === d && state.phase === "decide");
+      if (isOpen) b.classList.add("open");
+      if (state.pick === d) b.classList.add("picked");
+      b.disabled = state.phase !== "pick";
+      let inner = "";
+      if (isOpen) {
+        inner = `<span class="prize" aria-hidden="true">${d === state.car ? "🚗" : "🐐"}</span>`;
+      }
+      inner += `<span class="num">${d + 1}</span>`;
+      if (state.pick === d) inner += `<span class="tag">ваш выбор</span>`;
+      if (state.phase === "done" && state.final === d && state.final !== state.pick) inner += `<span class="tag">новый выбор</span>`;
+      b.innerHTML = inner;
+      const what = isOpen ? (d === state.car ? ", машина" : ", коза") : "";
+      b.setAttribute("aria-label", `Дверь ${d + 1}${what}`);
+      b.addEventListener("click", () => onPick(d));
+      doorsEl.appendChild(b);
+    }
+  }
+
+  function renderActions() {
+    actionsEl.innerHTML = "";
+    if (state.phase === "decide") {
+      const other = others(state.pick).find((d) => d !== state.act.door);
+      actionsEl.append(
+        button(`Остаться на ${state.pick + 1}`, "btn stay", () => onDecide(false)),
+        button(`Сменить на ${other + 1}`, "btn switch", () => onDecide(true)),
+      );
+    } else if (state.phase === "done") {
+      actionsEl.append(button("Следующий раунд", "btn", newRound));
+    }
+  }
+
+  function button(text, cls, fn) {
+    const b = document.createElement("button");
+    b.className = cls; b.textContent = text; b.addEventListener("click", fn);
+    return b;
+  }
+
+  function renderHint() {
+    hintEl.hidden = !hintToggle.checked;
+    if (!hintToggle.checked) return;
+    if (state.phase !== "decide") {
+      hintEl.innerHTML = state.mode === "hidden"
+        ? "Расчёт появится, когда ведущий предложит смену. Он учитывает и то, что вы пока знаете о ведущем."
+        : "Расчёт появится, когда ведущий предложит смену.";
+      return;
+    }
+    const post = state.mode === "known" ? { [state.host]: 1 } : state.post;
+    const p = switchWinProb(post, state.pick, state.act);
+    const advice = Math.abs(p - 0.5) < 1e-9 ? "без разницы" : p > 0.5 ? "выгоднее менять" : "выгоднее остаться";
+    const pSwitch = Math.round(p * 100);
+    hintEl.innerHTML = `P(выигрыш при смене) = <strong>${pSwitch}%</strong>, при отказе — <strong>${100 - pSwitch}%</strong>: ${advice}.` +
+      (state.mode === "hidden" ? " Учтены текущие вероятности типов ведущего." : "");
+  }
+
+  function renderStats() {
+    const host = state.mode === "known" ? HOSTS[state.host] : null;
+    const rows = [
+      ["stay", "Оставаться", "var(--blue)", host ? host.theory.stay : NaN],
+      ["switch", "Менять", "var(--orange)", host ? host.theory.switch : NaN],
+      ["coin", "Монетка", "var(--aqua)", host ? (host.theory.stay + host.theory.switch) / 2 : NaN],
+    ];
+    const body = $("stats-body");
+    body.innerHTML = "";
+    for (const [key, label, color, th] of rows) {
+      const s = state.stats[key];
+      const rate = s.n ? s.w / s.n : NaN;
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        `<td><span class="swatch" style="background:${color}"></span>${label}</td>` +
+        `<td>${s.n}</td><td>${s.w}</td><td>${pct(rate)}</td>` +
+        `<td class="bar-cell"><div class="bar"><span style="width:${s.n ? rate * 100 : 0}%;background:${color}"></span>` +
+        (Number.isFinite(th) ? `<i style="left:calc(${th * 100}% - 1px)"></i>` : "") + `</div></td>` +
+        `<td>${Number.isFinite(th) ? pct(th) : "?"}</td>`;
+      body.appendChild(tr);
+    }
+    const notes = [];
+    if (state.stats.nooffer) notes.push(`раундов без предложения смены: ${state.stats.nooffer}`);
+    if (state.stats.voided) notes.push(`аннулировано (ведущий открыл машину): ${state.stats.voided}`);
+    if (state.mode === "hidden") notes.push("теория скрыта, пока вы не назовёте ведущего");
+    $("stats-note").textContent = notes.length ? notes.join("; ") + "." : "";
+  }
+
+  // ---------- автоигра ----------
+  function autoPlay(switchProb) {
+    const host = HOSTS[activeHost()];
+    for (let i = 0; i < 1000; i++) {
+      const c = Math.floor(Math.random() * 3), k = Math.floor(Math.random() * 3);
+      const a = sample(host.actions(c, k));
+      if (a.type === "carshown") { state.stats.voided++; continue; }
+      if (a.type === "nooffer") { state.stats.nooffer++; continue; }
+      const sw = Math.random() < switchProb;
+      const finalDoor = sw ? others(k).find((d) => d !== a.door) : k;
+      const key = switchProb === 0.5 ? "coin" : sw ? "switch" : "stay";
+      state.stats[key].n++;
+      if (finalDoor === c) state.stats[key].w++;
+    }
+    renderStats();
+  }
+
+  // ---------- режим «угадай ведущего» ----------
+  function startHidden() {
+    state.hiddenHost = HIDDEN_POOL[Math.floor(Math.random() * HIDDEN_POOL.length)];
+    state.post = Object.fromEntries(HIDDEN_POOL.map((h) => [h, 1 / HIDDEN_POOL.length]));
+    state.rounds = 0;
+    state.history = [];
+    state.stats = freshStats();
+    $("guess-result").textContent = "";
+    renderGuess(true);
+    renderPosterior();
+    newRound();
+    renderStats();
+  }
+
+  function updatePosterior() {
+    const a = state.act;
+    let z = 0;
+    const next = {};
+    for (const h of HIDDEN_POOL) {
+      next[h] = state.post[h] * likelihood(h, state.car, state.pick, a);
+      z += next[h];
+    }
+    for (const h of HIDDEN_POOL) state.post[h] = next[h] / z;
+    state.rounds++;
+    const right = state.pick === state.car;
+    const what = a.type === "offer" ? "предложил смену" : a.type === "nooffer" ? "не предложил смену" : "открыл машину";
+    state.history.push(`${right ? "угадали" : "не угадали"} → ${what}`);
+    renderPosterior();
+  }
+
+  function renderPosterior() {
+    $("rounds-count").textContent = state.rounds;
+    const box = $("posterior");
+    box.innerHTML = "";
+    const order = HIDDEN_POOL.slice().sort((a, b) => state.post[b] - state.post[a]);
+    for (const h of order) {
+      const row = document.createElement("div");
+      row.className = "post-row";
+      row.innerHTML = `<span>${HOSTS[h].name}</span>` +
+        `<div class="bar"><span style="width:${state.post[h] * 100}%;background:var(--blue)"></span></div>` +
+        `<span class="val">${pct(state.post[h])}</span>`;
+      box.appendChild(row);
+    }
+    const last = state.history.slice(-6);
+    $("history").textContent = last.length
+      ? "Последние раунды: " + last.join("; ") + "."
+      : "Пока ни одного раунда: все четыре ведущих равновероятны.";
+  }
+
+  function renderGuess(enabled) {
+    const box = $("guess");
+    box.innerHTML = "";
+    for (const h of HIDDEN_POOL) {
+      const b = button(HOSTS[h].name, "btn ghost", () => makeGuess(h));
+      b.disabled = !enabled;
+      box.appendChild(b);
+    }
+  }
+
+  function makeGuess(h) {
+    const truth = state.hiddenHost;
+    const ok = h === truth;
+    $("guess-result").innerHTML =
+      (ok ? `<span class="win">Верно!</span> ` : `<span class="lose">Нет.</span> `) +
+      `Это был ведущий «${HOSTS[truth].name}». ${HOSTS[truth].desc} ` +
+      `Раундов понадобилось: ${state.rounds}.`;
+    renderGuess(false);
+    const again = button("Новый скрытый ведущий", "btn", startHidden);
+    $("guess").appendChild(again);
+  }
+
+  // ---------- вкладки ----------
+  function setMode(mode) {
+    state.mode = mode;
+    $("tab-known").setAttribute("aria-selected", String(mode === "known"));
+    $("tab-hidden").setAttribute("aria-selected", String(mode === "hidden"));
+    $("panel-known").hidden = mode !== "known";
+    $("panel-hidden").hidden = mode !== "hidden";
+    $("posterior-card").hidden = mode !== "hidden";
+    // в скрытом режиме автоигра выдала бы ведущего без раздумий
+    $("auto").hidden = mode === "hidden";
+    if (mode === "hidden") {
+      startHidden();
+    } else {
+      state.stats = freshStats();
+      newRound();
+      renderStats();
+    }
+  }
+
+  $("tab-known").addEventListener("click", () => setMode("known"));
+  $("tab-hidden").addEventListener("click", () => setMode("hidden"));
+  hintToggle.addEventListener("change", renderHint);
+  document.querySelectorAll("[data-auto]").forEach((b) =>
+    b.addEventListener("click", () => autoPlay(Number(b.dataset.auto))));
+  $("reset-stats").addEventListener("click", () => { state.stats = freshStats(); renderStats(); });
+
+  renderHostPicker();
+  newRound();
+  renderStats();
+})();
+</script>
+</body>
+</html>
